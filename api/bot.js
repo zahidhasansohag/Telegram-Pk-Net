@@ -1,7 +1,8 @@
 import { RouterOSAPI } from 'node-routeros';
 
 export default async function handler(req, res) {
-  const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  // আপনার বটের টোকেন সরাসরি দিয়ে দিলাম, যেন আর কখনো না হারায়!
+  const TELEGRAM_TOKEN = "8866966440:AAEtCyfJs1mjT9bTB_AVNbi9M6-UQrNK7tA";
   const ADMIN_ID = 6855051736;
 
   const body = req.body || {};
@@ -11,24 +12,21 @@ export default async function handler(req, res) {
   const isPing = req.method === 'GET';
   const isStatusCmd = req.method === 'POST' && text === '/status' && chatId === ADMIN_ID;
 
-  // ১. লাইভ রিপোর্ট সেকশন (Ping অথবা /status কমান্ড)
+  // ১. লাইভ রিপোর্ট সেকশন
   if (isPing || isStatusCmd) {
     let targetChatId = isPing ? ADMIN_ID : chatId;
-
     try {
-      // মিক্রোটিকের সাথে API কানেকশন
       const api = new RouterOSAPI({
         host: 'remote.cloudmikrotik.online',
         port: 10102,
         user: 'user',
         password: '0000'
       });
-
       await api.connect();
 
-      // অ্যাক্টিভ ইউজার এবং সিপিইউ ডেটা টানা
       const activeUsers = await api.write('/ip/hotspot/active/print');
       const userCount = activeUsers.length;
+      const userNames = activeUsers.slice(0, 5).map(u => u.user).join(', ');
 
       const resource = await api.write('/system/resource/print');
       const cpu = resource[0]['cpu-load'];
@@ -36,7 +34,7 @@ export default async function handler(req, res) {
 
       api.close();
 
-      const replyMessage = `📊 *PK NET Live Report*\n\n👥 অ্যাক্টিভ ইউজার: ${userCount} জন\n🌡️ CPU লোড: ${cpu}%\n⏱️ আপটাইম: ${uptime}`;
+      const replyMessage = `📊 *PK NET Live Report*\n\n👥 মোট ইউজার: ${userCount} জন\n👤 প্রথম ৫ জন: ${userNames}\n🌡️ CPU লোড: ${cpu}%\n⏱️ আপটাইম: ${uptime}`;
 
       await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -44,22 +42,20 @@ export default async function handler(req, res) {
         body: JSON.stringify({ chat_id: targetChatId, text: replyMessage })
       });
 
-      return res.status(200).json({ ok: true, message: "Report sent!" });
-
+      return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("Mikrotik API Error:", error);
       if (isStatusCmd) {
          await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: targetChatId, text: "❌ মিক্রোটিকের সাথে কানেক্ট করা যাচ্ছে না। VPN লাইন ঠিক আছে কি না চেক করুন।" })
+          body: JSON.stringify({ chat_id: targetChatId, text: "❌ মিক্রোটিকের সাথে কানেক্ট করা যাচ্ছে না। API পোর্ট ঠিক আছে কি না চেক করুন।" })
         });
       }
       return res.status(500).json({ error: "Connection Failed" });
     }
   }
 
-  // ২. সাধারণ কমান্ড সেকশন (/start, /packages)
+  // ২. সাধারণ কমান্ড সেকশন
   if (req.method === 'POST' && chatId) {
     if (text === '/status') return res.status(200).json({ ok: true });
 
@@ -80,5 +76,5 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  return res.status(405).json({ error: "Method Not Allowed" });
+  return res.status(200).json({ status: "Bot is running!" });
 }
