@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "node-routeros": "^2.3.1"
+    "node-routeros": "latest"
   }
 }
